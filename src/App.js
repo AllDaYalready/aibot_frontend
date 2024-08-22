@@ -1,25 +1,9 @@
-import logo from './logo.svg';
-import './App.css';
+// src/App.js
+import React from 'react';
+import ChatInterface from './components/ChatInterface';
 
-function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
+export default function App() {
+  // const sessionId = "your-session-id";  // 替换为实际的 session ID
+  const sessionId = "a422e93f-8637-477d-8ddf-d1c27c3203dc"
+  return <ChatInterface sessionId={sessionId} />;
 }
-
-export default App;
