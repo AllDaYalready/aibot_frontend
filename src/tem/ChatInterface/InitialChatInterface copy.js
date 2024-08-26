@@ -1,34 +1,33 @@
 import React, { useState } from 'react';
-import { ChevronDown, MessageSquare, User, Search, PlusCircle, Paperclip, Send, HelpCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Paperclip, Send, HelpCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom'; // 引入 useNavigate
+import axiosInstance from '../../axiosInstance';
 
 const InitialChatInterface = () => {
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [message, setMessage] = useState('');
     const [response, setResponse] = useState(null);
-
-    const toggleSidebar = () => {
-        setIsSidebarOpen(!isSidebarOpen);
-    };
+    const navigate = useNavigate(); // 获取 navigate 函数
 
     const handleMessageSend = async () => {
         if (message.trim() === '') return;
 
-
         try {
-            const response = await fetch('http://localhost:8000/api/chat/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ chat_user_input: message }),
+            // 先获取 CSRF token
+            await axiosInstance.get('/csrf-token/');
+            console.log('CSRF token fetched successfully');
+
+            const res = await axiosInstance.post('chat/', {
+                chat_user_input: message,
             });
 
-            const data = await response.json();
-            if (data.status === 'success') {
-                setResponse(data.last_message);
+            if (res.data.status === 'success') {
+                setResponse(res.data.last_message);
                 setMessage(''); // 清空输入框
+
+                // 更新 URL，无刷新跳转到带 session_id 的页面
+                navigate(`/chat/${res.data.session_id}`, { replace: true });
             } else {
-                console.error('Error:', data.message);
+                console.error('Error:', res.data.message);
             }
         } catch (error) {
             console.error('Request failed', error);

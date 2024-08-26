@@ -1,13 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import InitialChatInterface from './InitialChatInterface';
-import ChatInterface from './ChatInterface';
+import InitialChatInterface from './ChatInterface/InitialChatInterface';
+import ChatInterface from '../components/ChatInterface/ChatInterface';
 
 const ChatSession = () => {
   const { sessionId } = useParams();
   const [treeData, setTreeData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // // 获取 CSRF token 的请求
+  // useEffect(() => {
+  //   const fetchCsrfToken = async () => {
+  //     try {
+  //       await fetch('http://127.0.0.1:8000/api/csrf-token/', {
+  //         method: 'GET',
+  //         credentials: 'include', // 允许跨域发送 cookie
+  //       });
+  //       console.log('CSRF token fetched');
+  //     } catch (error) {
+  //       console.error('Error fetching CSRF token:', error);
+  //     }
+  //   };
+
+  //   fetchCsrfToken();
+  // }, []);
+
+
+
+
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -21,7 +43,9 @@ const ChatSession = () => {
       try {
         setLoading(true);
         console.log('Fetching data for session:', sessionId);
-        const response = await fetch(`http://127.0.0.1:8000/api/msgt/${sessionId}/`);
+        const response = await fetch(`http://127.0.0.1:8000/api/chat/${sessionId}/`, {
+          credentials: 'include', // 允许跨域发送 cookie
+        });
         console.log('Response status:', response.status);
         const text = await response.text();
         console.log('Response text:', text);
