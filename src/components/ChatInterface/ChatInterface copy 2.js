@@ -13,77 +13,6 @@ const ChatInterface = () => {
   const isSubmittingRef = useRef(false);
   const lastRequestIdRef = useRef(null);
 
-  const findMessageByUuid = (messages, uuid) => {
-    for (let message of messages) {
-      if (message.message_uuid === uuid) {
-        return message;
-      }
-      if (message.children) {
-        const found = findMessageByUuid(message.children, uuid);
-        if (found) return found;
-      }
-    }
-    return null;
-  };
-
-  const findLatestMessage = (messages) => {
-    let latestMessage = null;
-    let latestTimestamp = 0;
-
-    const traverse = (node) => {
-      if (node.timestamp > latestTimestamp) {
-        latestMessage = node;
-        latestTimestamp = node.timestamp;
-      }
-      if (node.children) {
-        node.children.forEach(traverse);
-      }
-    };
-
-    messages.forEach(traverse);
-    return latestMessage;
-  };
-
-  const buildPathToRoot = (messages, startUuid) => {
-    const path = [];
-    let currentMessage = findMessageByUuid(messages, startUuid);
-
-    while (currentMessage) {
-      path.unshift(currentMessage);
-      currentMessage = findMessageByUuid(messages, currentMessage.parent_uuid);
-    }
-
-    return path;
-  };
-
-  const processMessages = (messages, latestUuid) => {
-    const latestMessage = findMessageByUuid(messages, latestUuid) || findLatestMessage(messages);
-    if (!latestMessage) return [];
-
-    const pathToRoot = buildPathToRoot(messages, latestMessage.message_uuid);
-    const processedMessages = [];
-
-    const traverse = (node, parent = null, siblingIndex = 0, siblings = []) => {
-      const newMessage = {
-        ...node,
-        parent,
-        siblingInfo: `${siblingIndex + 1}/${siblings.length}`,
-      };
-      processedMessages.push(newMessage);
-
-      if (node.children && node.children.length > 0) {
-        const nextChild = pathToRoot.find(m => node.children.some(child => child.message_uuid === m.message_uuid)) || node.children[0];
-        const nextChildIndex = node.children.findIndex(child => child.message_uuid === nextChild.message_uuid);
-        traverse(nextChild, newMessage, nextChildIndex, node.children);
-      }
-    };
-
-    const rootNode = pathToRoot[0];
-    traverse(rootNode, null, 0, messages);
-
-    return processedMessages;
-  };
-
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -101,42 +30,31 @@ const ChatInterface = () => {
     fetchData();
   }, [sessionId]);
 
-  const handleSiblingChange = useCallback((index, direction) => {
-    setDisplayedMessages(prevMessages => {
-      const currentMessage = prevMessages[index];
-      if (!currentMessage.parent) return prevMessages;
-
-      const siblings = currentMessage.parent.children;
-      let newSiblingIndex = siblings.findIndex(sibling => sibling.message_uuid === currentMessage.message_uuid);
-
-      if (direction === 'next') {
-        newSiblingIndex++;
-      } else {
-        newSiblingIndex--;
-      }
-
-      if (newSiblingIndex < 0 || newSiblingIndex >= siblings.length) {
-        return prevMessages;
-      }
-
-      const newMessages = prevMessages.slice(0, index);
-      const traverse = (node, parent = null, siblingIndex = 0, siblings = []) => {
-        const newMessage = {
-          ...node,
-          parent,
-          siblingInfo: `${siblingIndex + 1}/${siblings.length}`,
-        };
-        newMessages.push(newMessage);
-
-        if (node.children && node.children.length > 0) {
-          traverse(node.children[0], newMessage, 0, node.children);
-        }
+  const processMessages = (messages, latestUuid) => {
+    const processedMessages = [];
+    const traverse = (node, parent = null, siblingIndex = 0, siblings = []) => {
+      const newMessage = {
+        ...node,
+        parent,
+        siblingInfo: `${siblingIndex + 1}/${siblings.length}`,
       };
+      processedMessages.push(newMessage);
 
-      traverse(siblings[newSiblingIndex], currentMessage.parent, newSiblingIndex, siblings);
+      if (node.children && node.children.length > 0) {
+        const nextChild = node.message_uuid === latestUuid 
+          ? node.children[node.children.length - 1]  // 如果是最新消息，选择最后一个子节点
+          : node.children[0];  // 否则选择第一个子节点
+        const nextChildIndex = node.children.indexOf(nextChild);
+        traverse(nextChild, newMessage, nextChildIndex, node.children);
+      }
+    };
 
-      return newMessages;
-    });
+    traverse(messages[0], null, 0, [messages[0]]);
+    return processedMessages;
+  };
+
+  const toggleSidebar = useCallback(() => {
+    setIsSidebarOpen(prev => !prev);
   }, []);
 
   const handleSendMessage = useCallback(async (message, requestId) => {
@@ -176,6 +94,49 @@ const ChatInterface = () => {
     }
   }, [sessionId, displayedMessages]);
 
+  const handleSiblingChange = useCallback((index, direction) => {
+    setDisplayedMessages(prevMessages => {
+      const currentMessage = prevMessages[index];
+      if (!currentMessage.parent) return prevMessages;
+
+      const siblings = currentMessage.parent.children;
+      let newSiblingIndex = siblings.findIndex(sibling => sibling.message_uuid === currentMessage.message_uuid);
+
+      if (direction === 'next') {
+        newSiblingIndex++;
+      } else {
+        newSiblingIndex--;
+      }
+
+      if (newSiblingIndex < 0 || newSiblingIndex >= siblings.length) {
+        return prevMessages;
+      }
+
+      const newMessages = prevMessages.slice(0, index);
+      const traverse = (node, parent = null, siblingIndex = 0, siblings = []) => {
+        const newMessage = {
+          ...node,
+          parent,
+          siblingInfo: `${siblingIndex + 1}/${siblings.length}`,
+        };
+        newMessages.push(newMessage);
+
+        if (node.children && node.children.length > 0) {
+          const nextChild = node.message_uuid === latestMessageUuidInThread 
+            ? node.children[node.children.length - 1]
+            : node.children[0];
+          const nextChildIndex = node.children.indexOf(nextChild);
+          traverse(nextChild, newMessage, nextChildIndex, node.children);
+        }
+      };
+
+      traverse(siblings[newSiblingIndex], currentMessage.parent, newSiblingIndex, siblings);
+
+      console.log('Updated messages after sibling change:', newMessages);
+      return newMessages;
+    });
+  }, [latestMessageUuidInThread]);
+
   const handleChangeMessage = useCallback(async (messageUuid, newMessage) => {
     try {
       const response = await changeMessage(sessionId, messageUuid, newMessage);
@@ -207,10 +168,6 @@ const ChatInterface = () => {
       // 显示错误消息给用户
     }
   }, [sessionId]);
-
-  const toggleSidebar = useCallback(() => {
-    setIsSidebarOpen(prev => !prev);
-  }, []);
 
   console.log('Rendering ChatInterface with displayedMessages:', displayedMessages);
 

@@ -28,3 +28,19 @@ export const fetchChatData = async (sessionId) => {
     throw error;
   }
 };
+
+export const changeMessage = async (sessionId, messageUuid, newMessage = null) => {
+  const endpoint = `/chat/${sessionId}/${messageUuid}`;
+  console.log('Sending POST request to:', endpoint);
+  
+  const requestBody = newMessage ? { new_message: newMessage } : {};
+  console.log('Request body:', requestBody);
+
+  try {
+    const response = await axiosInstance.post(endpoint, requestBody);
+    return response.data;
+  } catch (error) {
+    console.error('API request failed', error);
+    throw error;
+  }
+};
