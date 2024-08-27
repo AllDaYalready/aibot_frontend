@@ -9,7 +9,6 @@ const ChatInterface = () => {
   const { sessionId } = useParams();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [displayedMessages, setDisplayedMessages] = useState([]);
-  const [originalMessages, setOriginalMessages] = useState([]); // Store original data
   const [latestMessageUuidInThread, setLatestMessageUuidInThread] = useState(null);
   const isSubmittingRef = useRef(false);
   const lastRequestIdRef = useRef(null);
@@ -92,7 +91,6 @@ const ChatInterface = () => {
         const data = await fetchChatData(sessionId);
         console.log('Fetched chat data:', data);
         if (data.tree_data && data.latest_message_uuid_in_thread) {
-          setOriginalMessages(data.tree_data); // Store the original tree data
           setLatestMessageUuidInThread(data.latest_message_uuid_in_thread);
           const processed = processMessages(data.tree_data, data.latest_message_uuid_in_thread);
           setDisplayedMessages(processed);
@@ -110,43 +108,30 @@ const ChatInterface = () => {
       let siblings, newSiblingIndex;
 
       if (!currentMessage.parent) {
-        // Handle root node using originalMessages to find all root nodes
-        siblings = originalMessages.filter(m => m.parent_uuid === null);
-        console.log('Filtered root node siblings from originalMessages:', siblings);
+        // 处理根节点
+        siblings = prevMessages.filter(m => !m.parent);
         newSiblingIndex = siblings.findIndex(m => m.message_uuid === currentMessage.message_uuid);
       } else {
-        // Handle child nodes
         siblings = currentMessage.parent.children;
-        console.log('Child node siblings:', siblings);
         newSiblingIndex = siblings.findIndex(sibling => sibling.message_uuid === currentMessage.message_uuid);
       }
 
-      console.log('Current sibling index:', newSiblingIndex);
-
       if (direction === 'next') {
         newSiblingIndex++;
-      } else if (direction === 'prev') {
+      } else {
         newSiblingIndex--;
       }
 
-      console.log('New sibling index:', newSiblingIndex);
-
       if (newSiblingIndex < 0 || newSiblingIndex >= siblings.length) {
-        console.warn('New sibling index out of bounds, no changes made.');
         return prevMessages;
       }
 
-      const newSibling = siblings[newSiblingIndex];
-      console.log('New sibling selected:', newSibling);
-
       const newMessages = prevMessages.slice(0, index);
-
       const traverse = (node, parent = null, siblingIndex = 0, siblings = []) => {
-        console.log('Traversing node:', node);
         const newMessage = {
           ...node,
           parent,
-          siblingInfo: `${siblingIndex + 1}/${siblings.length}`,
+          siblingInfo: `${siblingIndex + 1}/${siblings.length || prevMessages.filter(m => !m.parent).length}`,
         };
         newMessages.push(newMessage);
 
@@ -155,12 +140,11 @@ const ChatInterface = () => {
         }
       };
 
-      traverse(newSibling, currentMessage.parent, newSiblingIndex, siblings);
+      traverse(siblings[newSiblingIndex], currentMessage.parent, newSiblingIndex, siblings);
 
-      console.log('New messages after traversal:', newMessages);
       return newMessages;
     });
-  }, [originalMessages]); // Depend on originalMessages
+  }, []);
 
   const handleSendMessage = useCallback(async (message, requestId) => {
     console.log('Attempting to send message:', message);
